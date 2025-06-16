@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Night City Adventures</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace; /* Classic CLI font */
+      background-color: #0A0A0A; /* Very dark background */
+      color: #00FF00; /* Green text, classic terminal */
+    }
+    /* Custom scrollbar for webkit browsers */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1A1A1A;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #00FF00;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00CC00;
+    }
+    .cli-input::placeholder {
+      color: #009900; /* Darker green for placeholder */
+    }
+    .blinking-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 1.2em;
+      background-color: #00FF00;
+      animation: blink 1s step-end infinite;
+      margin-left: 2px;
+      vertical-align: bottom;
+    }
+    @keyframes blink {
+      50% {
+        background-color: transparent;
+      }
+    }
+    
+    /* Audio Control Sliders */
+    .slider-cyan::-webkit-slider-thumb {
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #00FFFF;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+    }
+    .slider-cyan::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #00FFFF;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+    }
+    
+    .slider-green::-webkit-slider-thumb {
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #00FF00;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0, 255, 0, 0.5);
+    }
+    .slider-green::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #00FF00;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(0, 255, 0, 0.5);
+    }
+    
+    .slider-yellow::-webkit-slider-thumb {
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #FFFF00;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(255, 255, 0, 0.5);
+    }
+    .slider-yellow::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #FFFF00;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(255, 255, 0, 0.5);
+    }
+  </style>
+<link rel="stylesheet" href="">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

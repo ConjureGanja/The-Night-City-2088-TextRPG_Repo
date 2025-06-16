@@ -1,0 +1,183 @@
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Chat } from '@google/genai';
+import { StoryLogEntry, LogEntryType } from './types';
+import { INITIAL_PLAYER_MESSAGE, IMAGE_PROMPT_MARKER_START, IMAGE_PROMPT_MARKER_END } from './constants';
+import { 
+  initiateChatSession, 
+  sendMessageToChat, 
+  generateImageFromPrompt,
+  extractImagePromptFromStory,
+  cleanStoryText
+} from './services/geminiService';
+import CommandLineOutput from './components/CommandLineOutput';
+import CommandInput from './components/CommandInput';
+import ApiKeySettings from './components/ApiKeySettings';
+
+const App: React.FC = () => {
+  const [storyLog, setStoryLog] = useState<StoryLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [chatSession, setChatSession] = useState<Chat | null>(null);
+  const [userApiKey, setUserApiKey] = useState<string>('');
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+      setUserApiKey(savedApiKey);
+    } else {
+      setIsLoading(false); // Stop loading if no API key
+    }
+  }, []);
+
+
+
+  const getCurrentTimestamp = (): string => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  const addLogEntry = useCallback((type: LogEntryType, content: string) => {
+    setStoryLog(prevLog => [...prevLog, { 
+      id: `${Date.now()}-${Math.random()}`, 
+      type, 
+      content, 
+      timestamp: getCurrentTimestamp() 
+    }]);
+  }, []);  const processPlayerCommand = useCallback(async (command: string) => {
+    if (!chatSession) {
+      addLogEntry(LogEntryType.ERROR, "Chat session not initialized. Please refresh.");
+      setIsLoading(false);
+      return;
+    }
+
+    addLogEntry(LogEntryType.PLAYER_INPUT, command);
+    setIsLoading(true);
+    addLogEntry(LogEntryType.LOADING, "Accessing Night City datastreams...");
+
+    try {
+      const response = await sendMessageToChat(chatSession, command);
+      let storyText = response.text || '';
+      
+      const imagePrompt = extractImagePromptFromStory(storyText, IMAGE_PROMPT_MARKER_START, IMAGE_PROMPT_MARKER_END);
+      const cleanedStory = cleanStoryText(storyText, IMAGE_PROMPT_MARKER_START, IMAGE_PROMPT_MARKER_END);
+
+      addLogEntry(LogEntryType.STORY, cleanedStory);
+
+      if (imagePrompt) {
+        addLogEntry(LogEntryType.IMAGE_CAPTION, `Visual cortex processing: ${imagePrompt}`);
+        addLogEntry(LogEntryType.LOADING, "Generating optical feed...");
+        try {
+          const imageUrl = await generateImageFromPrompt(imagePrompt, userApiKey);
+          if (imageUrl) {
+            addLogEntry(LogEntryType.IMAGE, imageUrl);
+          } else {
+            addLogEntry(LogEntryType.ERROR, "Failed to generate image. Visual feed corrupted.");
+          }
+        } catch (imgError) {
+          console.error("Image generation error:", imgError);
+          addLogEntry(LogEntryType.ERROR, "Image generation subsystem failure. Diagnostics required.");
+        }
+      }
+    } catch (error) {
+      console.error("Gemini API error:", error);
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred with the AI connection.";
+      addLogEntry(LogEntryType.ERROR, `NETWATCH ALERT: Connection error - ${errorMsg}`);
+    } finally {
+      setIsLoading(false);
+      // Remove loading messages
+      setStoryLog(prevLog => prevLog.filter(entry => entry.type !== LogEntryType.LOADING));
+    }
+  }, [chatSession, addLogEntry, userApiKey]);
+
+  // Initialize game
+  useEffect(() => {
+    if (!userApiKey) return; // Don't initialize without API key
+
+    const initializeGame = async () => {
+      addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Booting Night City Terminal Interface v2.7...");
+      addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Connecting to Gemini Mainframe...");
+      
+      // Check usage status and show appropriate messages
+      const usage = UsageTracker.getUsageStatus();
+      if (usage.isPremium) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, "👑 PREMIUM CORP ACCESS DETECTED - Full privileges granted.");
+      } else {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `🆓 Free tier active - ${usage.messagesRemaining} messages remaining today.`);
+        if (usage.messagesRemaining <= 3) {
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "⚡ Upgrade to Premium for unlimited access to Night City!");
+        }
+      }
+      
+      try {
+        const session = initiateChatSession(userApiKey);
+        setChatSession(session);
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Gemini connection established. Stand by for mission briefing...");
+        await processPlayerCommand(INITIAL_PLAYER_MESSAGE); // Send initial message to get the game started
+      } catch (error) {
+        console.error("Initialization error:", error);
+        const errorMsg = error instanceof Error ? error.message : "Unknown initialization failure.";
+        addLogEntry(LogEntryType.ERROR, `Initialization failed: ${errorMsg}`);
+        setIsLoading(false);
+      }
+    };
+
+    initializeGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userApiKey]); // Re-initialize when API key changes
+
+  const handlePremiumUpgrade = () => {
+    setUsageRefreshKey(prev => prev + 1); // Refresh usage display
+    addLogEntry(LogEntryType.SYSTEM_MESSAGE, "🎉 PREMIUM ACTIVATION SUCCESSFUL!");
+    addLogEntry(LogEntryType.SYSTEM_MESSAGE, "👑 You now have unlimited access to Night City's networks.");
+    addLogEntry(LogEntryType.SYSTEM_MESSAGE, "🖼️ AI image generation enabled for immersive experiences.");
+  };
+
+  const handleShowPremiumUpgrade = () => {
+    setShowPremiumUpgrade(true);
+  };
+
+  const handleClosePremiumUpgrade = () => {
+    setShowPremiumUpgrade(false);
+  };
+
+  // Auto-scroll
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [storyLog]);
+
+  return (
+    <div className="flex flex-col h-screen bg-black text-green-400 font-mono">
+      <ApiKeySettings 
+        onApiKeySet={setUserApiKey} 
+        currentApiKey={userApiKey}
+      />
+      
+      <UsageStatus 
+        key={usageRefreshKey}
+        onUpgradeClick={handleShowPremiumUpgrade}
+      />
+      
+      <PremiumUpgrade
+        isVisible={showPremiumUpgrade}
+        onClose={handleClosePremiumUpgrade}
+        onUpgrade={handlePremiumUpgrade}
+        remainingMessages={UsageTracker.getRemainingMessages()}
+      />
+      
+      <header className="p-2 border-b border-green-700 text-center">
+        <h1 className="text-xl font-bold text-yellow-400">[ NIGHT CITY ADVENTURES ]</h1>
+        <p className="text-xs text-gray-500">Powered by Gemini & Imagen</p>
+      </header>
+      <main ref={outputRef} className="flex-grow overflow-y-auto">
+        <CommandLineOutput log={storyLog} />
+      </main>
+      <CommandInput onSubmit={processPlayerCommand} isLoading={isLoading} />
+      <footer className="p-1 border-t border-green-700 text-center text-xs text-gray-600">
+        SYSTEM STATUS: {isLoading ? "BUSY" : "IDLE"} | CONNECTION: SECURE | LOCATION: NIGHT CITY
+      </footer>
+    </div>
+  );
+};
+
+export default App;

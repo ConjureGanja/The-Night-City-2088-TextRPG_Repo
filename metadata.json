@@ -1,0 +1,5 @@
+{
+  "name": "Night City Adventures: A Cyberpunk Text Game",
+  "description": "A dynamic text adventure game set in the dystopian, neon-lit Night City. Uses Gemini for story generation and Imagen for visual scene depiction, presented in a CLI-style interface.",
+  "requestFramePermissions": []
+}
