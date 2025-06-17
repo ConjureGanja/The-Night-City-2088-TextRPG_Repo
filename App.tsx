@@ -31,6 +31,7 @@ import CharacterProgressionPanel from './components/CharacterProgressionPanel';
 import CharacterCreationPanel from './components/CharacterCreationPanel';
 import MapPanel from './components/MapPanel';
 import UsageStatusDisplay from './components/UsageStatusDisplay';
+import PremiumUpgrade from './components/PremiumUpgrade';
 
 const App: React.FC = () => {
   const [storyLog, setStoryLog] = useState<StoryLogEntry[]>([]);
@@ -50,6 +51,8 @@ const App: React.FC = () => {
   // Freemium state
   const [freemiumAvailable, setFreemiumAvailable] = useState<boolean>(false);
   const [showFreemiumError, setShowFreemiumError] = useState<string>('');
+  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState<boolean>(false);
+  const [remainingMessages, setRemainingMessages] = useState<number>(5);
   
   // UI refresh state to force component updates
   const [uiRefreshKey, setUiRefreshKey] = useState<number>(0);
@@ -58,8 +61,24 @@ const App: React.FC = () => {
 
   // Check freemium availability on app load
   useEffect(() => {
-    checkFreemiumAvailability().then(setFreemiumAvailable);
-  }, []);
+    const updateFreemiumStatus = async () => {
+      const available = await checkFreemiumAvailability();
+      setFreemiumAvailable(available);
+      
+      // Also update remaining messages if in freemium mode
+      if (available && !userApiKey) {
+        try {
+          const { freemiumApi } = await import('./services/freemiumService');
+          const status = await freemiumApi.getUserStatus();
+          setRemainingMessages(status.remaining);
+        } catch (error) {
+          console.error('Failed to get freemium status:', error);
+        }
+      }
+    };
+    
+    updateFreemiumStatus();
+  }, [userApiKey]);
 
   // Load API key from localStorage on component mount
   useEffect(() => {
@@ -190,6 +209,8 @@ const App: React.FC = () => {
         if (result.isFreemium && result.error.includes('Free tier limit exceeded')) {
           addLogEntry(LogEntryType.SYSTEM_MESSAGE, `🚫 ${result.error}`);
           setShowFreemiumError(result.error);
+          setRemainingMessages(0);
+          setShowPremiumUpgrade(true);
           return;
         } else {
           addLogEntry(LogEntryType.SYSTEM_MESSAGE, `❌ Error: ${result.error}`);
@@ -198,6 +219,11 @@ const App: React.FC = () => {
       }
       
       let storyText = result.response;
+      
+      // Update remaining messages count if using freemium
+      if (result.isFreemium && !userApiKey) {
+        setRemainingMessages(prev => Math.max(0, prev - 1));
+      }
       
       // Process story and update location/stats
       const { cleanedStory, locationChanged, statsUpdated } = processStoryResponse(storyText);
@@ -352,7 +378,10 @@ const App: React.FC = () => {
         {freemiumAvailable && (
           <UsageStatusDisplay 
             className="mt-2 mx-4"
-            onUpgradeClick={() => setShowFreemiumError('')}
+            onUpgradeClick={() => {
+              setShowFreemiumError('');
+              setShowPremiumUpgrade(true);
+            }}
           />
         )}
       </div>
@@ -463,6 +492,18 @@ const App: React.FC = () => {
           onCancel={() => setIsCreatingCharacter(false)}
         />
       )}
+
+      {/* Premium Upgrade Modal */}
+      <PremiumUpgrade
+        isVisible={showPremiumUpgrade}
+        onClose={() => setShowPremiumUpgrade(false)}
+        onUpgrade={() => {
+          setShowPremiumUpgrade(false);
+          // Refresh freemium status after upgrade
+          checkFreemiumAvailability().then(setFreemiumAvailable);
+        }}
+        remainingMessages={remainingMessages}
+      />
     </div>
   );
 };

@@ -25,14 +25,33 @@ interface FreemiumError {
 
 class FreemiumApiService {
   private baseUrl: string;
-  private fingerprint: string;
-  constructor() {
-    this.baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+  private fingerprint: string;  constructor() {
+    // Handle both browser and Node.js environments
+    let apiUrl = 'http://localhost:3001';
+    try {
+      // Only access import.meta in browser environment
+      if (typeof window !== 'undefined' && (import.meta as any).env?.VITE_API_URL) {
+        apiUrl = (import.meta as any).env.VITE_API_URL;
+      }
+    } catch (e) {
+      // Fallback for Node.js environment
+      apiUrl = process.env.VITE_API_URL || 'http://localhost:3001';
+    }
+    this.baseUrl = apiUrl;
     this.fingerprint = this.generateFingerprint();
   }
-
   private generateFingerprint(): string {
-    // Generate a browser fingerprint for user identification
+    // Handle both browser and Node.js environments
+    if (typeof document === 'undefined' || typeof navigator === 'undefined') {
+      // Node.js environment (testing)
+      return btoa(JSON.stringify({
+        platform: 'test',
+        userAgent: 'test-environment',
+        timezone: 'UTC'
+      }));
+    }
+
+    // Browser environment
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     ctx?.fillText('fingerprint', 10, 10);

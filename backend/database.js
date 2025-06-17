@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -58,9 +59,7 @@ createTables();
 export const getOrCreateUser = (fingerprint, email = null) => {
   const selectStmt = db.prepare('SELECT * FROM users WHERE fingerprint = ?');
   let user = selectStmt.get(fingerprint);
-  
-  if (!user) {
-    const { randomUUID } = await import('crypto');
+    if (!user) {
     const userId = randomUUID();
     const insertStmt = db.prepare(`
       INSERT INTO users (id, fingerprint, email) 

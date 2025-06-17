@@ -10,7 +10,24 @@ jest.mock('./services/geminiService', () => ({
   }),
   generateImageFromPrompt: jest.fn().mockResolvedValue('mock-image-url'),
   extractImagePromptFromStory: jest.fn().mockReturnValue(null),
-  cleanStoryText: jest.fn().mockImplementation((text) => text)
+  cleanStoryText: jest.fn().mockImplementation((text) => text),
+  checkFreemiumAvailability: jest.fn().mockResolvedValue(true),
+  sendMessageFreemium: jest.fn().mockResolvedValue({
+    response: { text: () => 'Mock AI response' },
+    usage: { totalTokens: 100, promptTokens: 50, completionTokens: 50 }
+  }),
+  narrativeMemoryService: {
+    addMemory: jest.fn(),
+    getRecentMemories: jest.fn().mockReturnValue([]),
+    getLocationHistory: jest.fn().mockReturnValue([]),
+    getSummary: jest.fn().mockReturnValue('')
+  },
+  generateCharacterInfo: jest.fn().mockReturnValue('Mock character info'),
+  processStoryResponse: jest.fn().mockReturnValue({
+    cleanedStory: 'Mock story',
+    locationChanged: false,
+    statsUpdated: false
+  })
 }));
 
 // Mock the VisualCortexPanel component
@@ -59,8 +76,8 @@ describe('App Component', () => {
       expect(screen.getByText(/Google Gemini API Key Required/)).toBeInTheDocument();
     });
     
-    expect(screen.getByPlaceholderText('Enter your Gemini API key...')).toBeInTheDocument();
-    expect(screen.getByText('Save & Connect')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter API key or leave empty for free tier...')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Free Tier')).toBeInTheDocument();
   });
 
   test('renders footer with system status', () => {
