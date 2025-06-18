@@ -1,7 +1,0 @@
-# Railway Environment Variables (copy these exactly)
-PORT=3001
-NODE_ENV=production
-GEMINI_API_KEY=AIzaSyB_pFz3lID_Jpw_-B6Yb9tKody-KL4DUXs
-JWT_SECRET=night_city_2088_super_secret_jwt_key_12345
-DATABASE_URL=./database.db
-FRONTEND_URL=https://your-frontend-url.vercel.app
