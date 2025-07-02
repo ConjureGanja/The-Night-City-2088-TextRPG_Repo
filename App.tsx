@@ -8,7 +8,6 @@ import {
 import { 
   initiateChatSession, 
   initiateEnhancedChatSession,
-  sendMessageToChat, 
   generateImageFromPrompt,
   extractImagePromptFromStory,
   generateCharacterInfo,
@@ -20,6 +19,8 @@ import {
 } from './services/geminiService';
 import { characterProgressionService } from './services/characterProgressionService';
 import { mapService } from './services/mapService';
+import { gameStateManager } from './gamestatemanager';
+import { saveGameService } from './services/saveGameService';
 
 import CommandLineOutput from './components/CommandLineOutput';
 import CommandInput from './components/CommandInput';
@@ -32,6 +33,7 @@ import CharacterCreationPanel from './components/CharacterCreationPanel';
 import MapPanel from './components/MapPanel';
 import UsageStatusDisplay from './components/UsageStatusDisplay';
 import PremiumUpgrade from './components/PremiumUpgrade';
+import SystemTestPanel from './components/SystemTestPanel';
 
 const App: React.FC = () => {
   const [storyLog, setStoryLog] = useState<StoryLogEntry[]>([]);
@@ -50,7 +52,6 @@ const App: React.FC = () => {
   
   // Freemium state
   const [freemiumAvailable, setFreemiumAvailable] = useState<boolean>(false);
-  const [showFreemiumError, setShowFreemiumError] = useState<string>('');
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState<boolean>(false);
   const [remainingMessages, setRemainingMessages] = useState<number>(5);
   
@@ -59,6 +60,12 @@ const App: React.FC = () => {
   
   const outputRef = useRef<HTMLDivElement>(null);
 
+  // Character avatar state
+  const [characterAvatarUrl, setCharacterAvatarUrl] = useState<string>('');
+  
+  // System test panel visibility
+  const [systemTestVisible, setSystemTestVisible] = useState<boolean>(false);
+  
   // Check freemium availability on app load
   useEffect(() => {
     const updateFreemiumStatus = async () => {
@@ -85,6 +92,14 @@ const App: React.FC = () => {
     const savedApiKey = localStorage.getItem('gemini_api_key');
     if (savedApiKey) {
       setUserApiKey(savedApiKey);
+    }
+  }, []);
+
+  // Load saved avatar on mount
+  useEffect(() => {
+    const savedAvatar = localStorage.getItem('character_avatar_url');
+    if (savedAvatar) {
+      setCharacterAvatarUrl(savedAvatar);
     }
   }, []);
 
@@ -147,40 +162,23 @@ const App: React.FC = () => {
     }
     
     if (lowerCommand === 'save game' || lowerCommand === 'save') {
-      try {
-        const characterData = characterProgressionService.saveCharacterData();
-        const mapData = mapService.saveGameState();
-        const narrativeData = narrativeMemoryService.saveMemory();
-        const gameState = {
-          character: characterData,
-          map: mapData,
-          narrative: narrativeData,
-          timestamp: new Date().toISOString()
-        };
-        localStorage.setItem('night_city_save', JSON.stringify(gameState));
-        addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Game saved successfully.");
-      } catch (error) {
-        addLogEntry(LogEntryType.ERROR, "Failed to save game.");
+      const result = saveGameService.quickSave();
+      if (result.success) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, result.message);
+      } else {
+        addLogEntry(LogEntryType.ERROR, result.message);
       }
       return;
     }
     
     if (lowerCommand === 'load game' || lowerCommand === 'load') {
-      try {
-        const savedGame = localStorage.getItem('night_city_save');
-        if (savedGame) {
-          const gameState = JSON.parse(savedGame);
-          characterProgressionService.loadCharacterData(gameState.character);
-          mapService.loadGameState(gameState.map);
-          if (gameState.narrative) {
-            narrativeMemoryService.loadMemory(gameState.narrative);
-          }
-          addLogEntry(LogEntryType.SYSTEM_MESSAGE, `Game loaded from ${new Date(gameState.timestamp).toLocaleString()}.`);
-        } else {
-          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "No saved game found.");
-        }
-      } catch (error) {
-        addLogEntry(LogEntryType.ERROR, "Failed to load game.");
+      const result = saveGameService.quickLoad();
+      if (result.success) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, result.message);
+        // Trigger UI refresh after loading
+        setUiRefreshKey(prev => prev + 1);
+      } else {
+        addLogEntry(LogEntryType.ERROR, result.message);
       }
       return;
     }
@@ -208,7 +206,6 @@ const App: React.FC = () => {
       if (result.error) {
         if (result.isFreemium && result.error.includes('Free tier limit exceeded')) {
           addLogEntry(LogEntryType.SYSTEM_MESSAGE, `🚫 ${result.error}`);
-          setShowFreemiumError(result.error);
           setRemainingMessages(0);
           setShowPremiumUpgrade(true);
           return;
@@ -225,20 +222,37 @@ const App: React.FC = () => {
         setRemainingMessages(prev => Math.max(0, prev - 1));
       }
       
-      // Process story and update location/stats
+      // Process story through enhanced game state manager
+      const storyUpdates = gameStateManager.updateFromStory(storyText);
+      
+      // Legacy processing (can be removed later)
       const { cleanedStory, locationChanged, statsUpdated } = processStoryResponse(storyText);
       
-      if (locationChanged) {
-        const currentLocation = mapService.getCurrentLocation();
-        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `Location updated: ${currentLocation?.name || 'Unknown'}`);
-        // Trigger UI refresh
-        setUiRefreshKey(prev => prev + 1);
+      // Provide feedback about detected changes
+      if (storyUpdates.experienceGained > 0) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `📈 Experience gained: ${storyUpdates.experienceGained}`);
       }
       
-      if (statsUpdated) {
-        addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Character stats updated");
-        // Trigger UI refresh
-        setUiRefreshKey(prev => prev + 1);
+      if (storyUpdates.damageTaken > 0) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `💔 Damage taken: ${storyUpdates.damageTaken}`);
+      }
+      
+      if (storyUpdates.itemsFound.length > 0) {
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `🎒 Items found: ${storyUpdates.itemsFound.join(', ')}`);
+      }
+      
+      if (storyUpdates.newLocation) {
+        const currentLocation = mapService.getCurrentLocation();
+        addLogEntry(LogEntryType.SYSTEM_MESSAGE, `📍 Location: ${currentLocation?.name || storyUpdates.newLocation}`);
+      }
+      
+      // Legacy compatibility - remove when fully migrated
+      if (locationChanged || storyUpdates.locationChanged) {
+        // Already handled by gameStateManager
+      }
+      
+      if (statsUpdated || storyUpdates.statsUpdated) {
+        // Already handled by gameStateManager
       }
       
       const imagePrompt = extractImagePromptFromStory(storyText, IMAGE_PROMPT_MARKER_START, IMAGE_PROMPT_MARKER_END);
@@ -246,20 +260,27 @@ const App: React.FC = () => {
       addLogEntry(LogEntryType.STORY, cleanedStory);
 
       if (imagePrompt) {
-        addLogEntry(LogEntryType.IMAGE_CAPTION, `Visual cortex processing: ${imagePrompt}`);
-        setIsProcessingImage(true);
-        try {
-          const imageUrl = await generateImageFromPrompt(imagePrompt, userApiKey);
-          if (imageUrl) {
-            addLogEntry(LogEntryType.IMAGE, imageUrl);
-          } else {
-            addLogEntry(LogEntryType.ERROR, "Failed to generate image. Visual feed corrupted.");
+        // Check if user can generate images
+        const canGenerateImages = await shouldGenerateImage(userApiKey);
+        
+        if (canGenerateImages) {
+          addLogEntry(LogEntryType.IMAGE_CAPTION, `Visual cortex processing: ${imagePrompt}`);
+          setIsProcessingImage(true);
+          try {
+            const imageUrl = await generateImageFromPrompt(imagePrompt, userApiKey);
+            if (imageUrl) {
+              addLogEntry(LogEntryType.IMAGE, imageUrl);
+            } else {
+              addLogEntry(LogEntryType.ERROR, "Failed to generate image. Visual feed corrupted.");
+            }
+          } catch (imgError) {
+            console.error("Image generation error:", imgError);
+            addLogEntry(LogEntryType.ERROR, "Image generation subsystem failure. Diagnostics required.");
+          } finally {
+            setIsProcessingImage(false);
           }
-        } catch (imgError) {
-          console.error("Image generation error:", imgError);
-          addLogEntry(LogEntryType.ERROR, "Image generation subsystem failure. Diagnostics required.");
-        } finally {
-          setIsProcessingImage(false);
+        } else {
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "🎨 Visual cortex enhancement requires premium neural implant. Upgrade to unlock image generation!");
         }
       }
     } catch (error) {
@@ -282,22 +303,29 @@ const App: React.FC = () => {
     
     // Add feedback to the log
     addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Character creation complete!");
-    addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Generating character avatar...");
-    
-    // Generate character avatar
-    try {
-      setIsProcessingImage(true);
-      const { generateCharacterAvatar } = await import('./services/geminiService');
-      const avatarUrl = await generateCharacterAvatar(userApiKey);
-      if (avatarUrl) {
-        addLogEntry(LogEntryType.IMAGE, avatarUrl);
-        addLogEntry(LogEntryType.IMAGE_CAPTION, "Character avatar generated");
+    // Generate character avatar if allowed
+    const canGenerateImages = await shouldGenerateImage(userApiKey);
+    if (canGenerateImages) {
+      addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Generating character avatar...");
+      try {
+        setIsProcessingImage(true);
+        const { generateCharacterAvatar } = await import('./services/geminiService');
+        const avatarUrl = await generateCharacterAvatar(userApiKey);
+        if (avatarUrl) {
+          addLogEntry(LogEntryType.IMAGE, avatarUrl);
+          addLogEntry(LogEntryType.IMAGE_CAPTION, "Character avatar generated");
+          // Save avatar URL for persistent display
+          setCharacterAvatarUrl(avatarUrl);
+          localStorage.setItem('character_avatar_url', avatarUrl);
+        }
+      } catch (error) {
+        console.error("Avatar generation error:", error);
+        addLogEntry(LogEntryType.ERROR, "Avatar generation failed, but continuing...");
+      } finally {
+        setIsProcessingImage(false);
       }
-    } catch (error) {
-      console.error("Avatar generation error:", error);
-      addLogEntry(LogEntryType.ERROR, "Avatar generation failed, but continuing...");
-    } finally {
-      setIsProcessingImage(false);
+    } else {
+      addLogEntry(LogEntryType.SYSTEM_MESSAGE, "🎨 Character avatar generation requires premium neural implant. Upgrade to unlock!");
     }
     
     addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Initializing enhanced game session with character data...");
@@ -319,6 +347,15 @@ const App: React.FC = () => {
         addLogEntry(LogEntryType.SYSTEM_MESSAGE, characterInfo);
         addLogEntry(LogEntryType.SYSTEM_MESSAGE, `Welcome to Night City, ${character.name}.`);
         addLogEntry(LogEntryType.SYSTEM_MESSAGE, "Type 'run' to begin your adventure in your apartment.");
+        
+        // Add early game message from Judy
+        setTimeout(() => {
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "📱 INCOMING MESSAGE:");
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "FROM: Judy Alvarez");
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "SUBJECT: Work Opportunity");
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, `Hey ${character.name}, heard you're good with tech. Got a gig that might interest you. Meet me in Kabuki when you're ready. -J`);
+          addLogEntry(LogEntryType.SYSTEM_MESSAGE, "💡 TIP: Check your map - Judy's location is marked in Kabuki Market");
+        }, 3000);
       } catch (error) {
         console.error("Error initializing enhanced session:", error);
         addLogEntry(LogEntryType.ERROR, "Failed to initialize game with character data. Please try again.");
@@ -361,6 +398,19 @@ const App: React.FC = () => {
     }
   }, [userApiKey, addLogEntry, isInitialized]); // Re-initialize when API key changes
 
+  // Subscribe to game state changes for real-time UI updates
+  useEffect(() => {
+    const handleStateChange = () => {
+      setUiRefreshKey(prev => prev + 1);
+    };
+    
+    gameStateManager.subscribe(handleStateChange);
+    
+    return () => {
+      gameStateManager.unsubscribe(handleStateChange);
+    };
+  }, []);
+
   // Auto-scroll
   useEffect(() => {
     if (outputRef.current) {
@@ -368,8 +418,45 @@ const App: React.FC = () => {
     }
   }, [storyLog]);
 
+  // Check if user can generate images (premium feature for free users)
+  const shouldGenerateImage = async (userApiKey: string): Promise<boolean> => {
+    if (userApiKey) {
+      return true; // Premium users with their own API key
+    }
+    
+    // Free users - check if image generation is allowed
+    try {
+      const { freemiumApi } = await import('./services/freemiumService');
+      return await freemiumApi.canGenerateImages();
+    } catch (error) {
+      console.error('Failed to check image generation permission:', error);
+      return false; // Default to not allowing for free users
+    }
+  };
+
   return (
     <div className="flex h-screen bg-black text-green-400 font-mono">
+      {/* Character Avatar - Persistent Display */}
+      {characterAvatarUrl && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="w-20 h-20 rounded-full border-2 border-cyan-400 overflow-hidden bg-gray-900">
+            <img 
+              src={characterAvatarUrl} 
+              alt="Character Avatar" 
+              className="w-full h-full object-cover"
+              onError={() => {
+                // Remove broken avatar
+                setCharacterAvatarUrl('');
+                localStorage.removeItem('character_avatar_url');
+              }}
+            />
+          </div>
+          <div className="text-xs text-center text-cyan-400 mt-1">
+            {characterProgressionService.getBackground().name}
+          </div>
+        </div>
+      )}
+      
       <div className="flex flex-col">
         <ApiKeySettings 
           onApiKeySet={handleApiKeySet} 
@@ -379,7 +466,6 @@ const App: React.FC = () => {
           <UsageStatusDisplay 
             className="mt-2 mx-4"
             onUpgradeClick={() => {
-              setShowFreemiumError('');
               setShowPremiumUpgrade(true);
             }}
           />
@@ -431,6 +517,17 @@ const App: React.FC = () => {
           title="Audio"
         >
           🔊
+        </button>
+        <button
+          onClick={() => setSystemTestVisible(!systemTestVisible)}
+          className={`w-8 h-8 rounded border text-xs font-bold transition-colors ${
+            systemTestVisible 
+              ? 'bg-green-600 border-green-400 text-black' 
+              : 'bg-gray-800 border-green-700 text-green-400 hover:bg-gray-700'
+          }`}
+          title="System Tests"
+        >
+          🔧
         </button>
       </div>
       
@@ -503,6 +600,11 @@ const App: React.FC = () => {
           checkFreemiumAvailability().then(setFreemiumAvailable);
         }}
         remainingMessages={remainingMessages}
+      />
+
+      {/* System Test Panel */}      <SystemTestPanel
+        isVisible={systemTestVisible}
+        onToggle={() => setSystemTestVisible(!systemTestVisible)}
       />
     </div>
   );

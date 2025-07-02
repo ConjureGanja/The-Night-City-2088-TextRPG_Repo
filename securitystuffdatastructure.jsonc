@@ -1,0 +1,35 @@
+{
+  // Type definitions for the security attestation data structure
+  "RequiredSecurityCheck": {
+    "Field": "string",
+    "Value": "boolean",
+    "DesiredValue": "boolean"
+  },
+  "ExpectedSecurityCheck": {
+    "Field": "string",
+    "Value": "boolean",
+    "DesiredValue": "boolean"
+  },
+  "InformationalSecurityCheck": {
+    "Field": "string",
+    "ValueFromComputer": "boolean",
+    "ValueFromTcgLog": "boolean",
+    "DesiredValue": "boolean",
+    "TcgValueIsVerifiable": "boolean"
+  },
+  "SecurityAttestationData": {
+    "Version": "number",
+    "HealthStatus": "string",
+    "Required": "RequiredSecurityCheck[]",
+    "Expected": "ExpectedSecurityCheck[]",
+    "Informational": "InformationalSecurityCheck[]"
+  },
+  // Status types for UI components
+  "SecurityStatus": ["healthy", "warning", "critical", "informational"],
+  "SecurityPanelProps": {
+    "title": "string",
+    "status": "SecurityStatus",
+    "checks": "array",
+    "description": "string"
+  }
+}

@@ -79,9 +79,10 @@ This game supports a freemium model where users get 5 free AI requests per day u
 4. Premium users get unlimited access
 
 **Benefits:**
+
 - No barrier to entry for new users
 - Your API key powers the free tier
 - Built-in monetization and upgrade path
 - Usage tracking and analytics
 
-See [FREEMIUM_SETUP.md](FREEMIUM_SETUP.md) for detailed setup instructions.
+#I have the file FREEMIUM_SETUP.md that contains detailed instructions for setting up the freemium model, including backend API setup and environment configuration. On my local machine only is where that file exists for my reference

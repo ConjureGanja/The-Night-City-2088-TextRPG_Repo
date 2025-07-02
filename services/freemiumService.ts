@@ -1,11 +1,19 @@
 // Freemium API service for Night City 2088
 // This handles API calls through your backend to implement usage limits
 
+interface FreemiumLimits {
+  messagesPerDay: number;
+  imageGeneration: boolean;
+  saveStates: number;
+  characterCreations: number;
+}
+
 interface UserStatus {
   isPremium: boolean;
   usageToday: number;
   limit: number;
   remaining: number;
+  features: FreemiumLimits;
 }
 
 interface ApiResponse<T> {
@@ -23,9 +31,24 @@ interface FreemiumError {
   upgradeUrl?: string;
 }
 
+// Feature limits for different tiers
+const FREE_TIER_LIMITS: FreemiumLimits = {
+  messagesPerDay: 10,
+  imageGeneration: false, // Disabled for free users
+  saveStates: 1,
+  characterCreations: 2
+};
+
+const PREMIUM_TIER_LIMITS: FreemiumLimits = {
+  messagesPerDay: -1, // Unlimited
+  imageGeneration: true,
+  saveStates: -1, // Unlimited
+  characterCreations: -1 // Unlimited
+};
+
 class FreemiumApiService {
   private baseUrl: string;
-  private fingerprint: string;  constructor() {
+  private fingerprint: string;constructor() {
     // Handle both browser and Node.js environments
     let apiUrl = 'http://localhost:3001';
     try {
@@ -121,7 +144,64 @@ class FreemiumApiService {
     const response = await fetch(`${this.baseUrl}/api/health`);
     return response.json();
   }
+
+  // Check if feature is available for current user
+  async canUseFeature(feature: keyof FreemiumLimits): Promise<{ allowed: boolean; message?: string }> {
+    try {
+      const status = await this.getUserStatus();
+      const limits = status.isPremium ? PREMIUM_TIER_LIMITS : FREE_TIER_LIMITS;
+      
+      switch (feature) {
+        case 'imageGeneration':
+          if (!limits.imageGeneration) {
+            return { 
+              allowed: false, 
+              message: 'Image generation is only available for premium users. Upgrade to unlock visual storytelling!' 
+            };
+          }
+          break;
+        case 'messagesPerDay':
+          if (limits.messagesPerDay !== -1 && status.usageToday >= limits.messagesPerDay) {
+            return { 
+              allowed: false, 
+              message: `Daily message limit of ${limits.messagesPerDay} reached. Upgrade for unlimited messages!` 
+            };
+          }
+          break;
+        case 'saveStates':
+          if (limits.saveStates !== -1) {
+            // This would need to check actual save count
+            return { 
+              allowed: true, 
+              message: `You can save ${limits.saveStates} game state(s). Premium users get unlimited saves.` 
+            };
+          }
+          break;
+      }
+      
+      return { allowed: true };
+    } catch (error) {
+      return { allowed: false, message: 'Unable to check feature availability' };
+    }
+  }
+
+  // Get user's feature limits
+  async getUserLimits(): Promise<FreemiumLimits> {
+    try {
+      const status = await this.getUserStatus();
+      return status.isPremium ? PREMIUM_TIER_LIMITS : FREE_TIER_LIMITS;
+    } catch (error) {
+      return FREE_TIER_LIMITS; // Default to free tier on error
+    }
+  }
+
+  // Check if image generation is allowed
+  async canGenerateImages(): Promise<boolean> {
+    const result = await this.canUseFeature('imageGeneration');
+    return result.allowed;
+  }
 }
 
 export const freemiumApi = new FreemiumApiService();
-export type { UserStatus, ApiResponse, FreemiumError };
+export type { UserStatus, ApiResponse, FreemiumError, FreemiumLimits };
+export { FREE_TIER_LIMITS, PREMIUM_TIER_LIMITS };

@@ -348,6 +348,108 @@ class InventoryService {
       console.error('Failed to load inventory:', error);
     }
   }
+
+  // Story integration methods
+  public addItemFromStory(itemName: string): boolean {
+    // Create item from story description
+    const item = this.createItemFromDescription(itemName);
+    if (item) {
+      return this.addItem(item, 1);
+    }
+    return false;
+  }
+
+  public removeItemFromStory(itemName: string): boolean {
+    // Find item by name and remove it
+    const slot = this.inventory.find(slot => 
+      slot.item && slot.item.name.toLowerCase().includes(itemName.toLowerCase())
+    );
+    
+    if (slot && slot.item) {
+      return this.removeItem(slot.item.id, 1);
+    }
+    return false;
+  }
+
+  private createItemFromDescription(description: string): Item | null {
+    const cleanDesc = description.toLowerCase().trim();
+    
+    // Map common item descriptions to actual items
+    const itemMappings: Record<string, Partial<Item> & { id: string; name: string }> = {
+      'data shard': {
+        id: 'data_shard_found',
+        name: 'Data Shard',
+        type: ItemType.DATA,
+        rarity: ItemRarity.COMMON,
+        weight: 0.1,
+        value: 100
+      },
+      'credstick': {
+        id: 'credstick_found',
+        name: 'Credstick',
+        type: ItemType.MISC,
+        rarity: ItemRarity.COMMON,
+        weight: 0.1,
+        value: 250
+      },
+      'weapon': {
+        id: 'found_weapon',
+        name: 'Found Weapon',
+        type: ItemType.WEAPON,
+        rarity: ItemRarity.COMMON,
+        weight: 2.0,
+        value: 500
+      },
+      'armor': {
+        id: 'found_armor',
+        name: 'Found Armor',
+        type: ItemType.ARMOR,
+        rarity: ItemRarity.COMMON,
+        weight: 5.0,
+        value: 300
+      },
+      'stimpack': {
+        id: 'stimpack_found',
+        name: 'Stimpack',
+        type: ItemType.CONSUMABLE,
+        rarity: ItemRarity.COMMON,
+        weight: 0.2,
+        value: 150
+      }
+    };
+
+    // Find matching item
+    for (const [key, itemData] of Object.entries(itemMappings)) {
+      if (cleanDesc.includes(key)) {
+        return this.createItem(itemData);
+      }
+    }
+
+    // Create generic item if no match found
+    return this.createItem({
+      id: `found_${Date.now()}`,
+      name: description,
+      type: ItemType.MISC,
+      rarity: ItemRarity.COMMON,
+      weight: 1.0,
+      value: 50
+    });
+  }
+
+  // Game state management
+  public saveInventoryData(): string {
+    return this.saveInventory();
+  }
+
+  public loadInventoryData(data: string): void {
+    this.loadInventory(data);
+  }
+
+  public resetInventory(): void {
+    this.inventory = Array.from({ length: this.maxSlots }, () => ({ item: null, quantity: 0 }));
+    this.equippedItems.clear();
+    this.addStartingItems();
+  }
 }
 
 // Export singleton instance
