@@ -101,7 +101,16 @@ const createTables = () => {
   if (achievementCount === 0) {
     const achievements = [
       { name: 'First Step', description: 'Completed the tutorial.', icon: 'path/to/icon1.png' },
-      { name: 'Night City Novice', description: 'Reached level 5.', icon: 'path/to/icon2.png' }
+      { name: 'Night City Novice', description: 'Reached level 5.', icon: 'path/to/icon2.png' },
+      { name: 'Street Samurai', description: 'Won your first combat encounter.', icon: 'path/to/icon3.png' },
+      { name: 'Netrunner Initiate', description: 'Hacked your first terminal.', icon: 'path/to/icon4.png' },
+      { name: 'Chrome Addict', description: 'Installed your first cybernetic upgrade.', icon: 'path/to/icon5.png' },
+      { name: 'Streetwise', description: 'Survived a random city event.', icon: 'path/to/icon6.png' },
+      { name: 'Data Broker', description: 'Completed a data-heist mission.', icon: 'path/to/icon7.png' },
+      { name: 'Shadow Walker', description: 'Completed a quest without being detected.', icon: 'path/to/icon8.png' },
+      { name: 'Augmented', description: 'Maxed out one cybernetic stat.', icon: 'path/to/icon9.png' },
+      { name: 'Legend of the Night', description: 'Reached level 50.', icon: 'path/to/icon10.png' }
+
     ];
     const stmt = db.prepare('INSERT INTO achievements (achievement_name, description, icon_url) VALUES (?, ?, ?)');
     achievements.forEach(ach => stmt.run(ach.name, ach.description, ach.icon));
