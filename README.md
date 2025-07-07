@@ -85,3 +85,33 @@ This game supports a freemium model where users get 5 free AI requests per day u
 - Usage tracking and analytics
 
 See [FREEMIUM_SETUP.md](FREEMIUM_SETUP.md) for detailed setup instructions.
+
+## Production Deployment
+
+Ready to deploy Night City 2088 to your website? We've got you covered:
+
+### 📦 **[Complete Deployment Guide](DEPLOYMENT.md)**
+Comprehensive guide for deploying to gpt-hq.com or any production server with:
+- Step-by-step server setup
+- Nginx configuration
+- SSL certificate setup  
+- Process management with PM2
+- Security considerations
+- Monitoring and maintenance
+
+### 🐳 **[Docker Deployment](DOCKER_DEPLOYMENT.md)**
+Containerized deployment using Docker and Docker Compose:
+- Quick start with containers
+- Production-ready configuration
+- SSL support with Let's Encrypt
+- Easy scaling and management
+
+### 🚀 **Quick Deploy Script**
+For automated deployment to gpt-hq.com:
+
+```bash
+# Download and run the deployment script
+curl -sSL https://raw.githubusercontent.com/ConjureGanja/The-Night-City-2088-TextRPG_Repo/main/deploy-gpt-hq.sh | bash
+```
+
+Choose the deployment method that best fits your infrastructure and requirements!
