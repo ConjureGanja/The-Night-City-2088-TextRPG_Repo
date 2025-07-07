@@ -138,6 +138,7 @@ dist
 # Additional security - API keys and secrets
 .env*
 !.env.example
+!.env.production.template
 *.key
 *.pem
 secrets.json
@@ -147,6 +148,15 @@ config/keys.js
 backend/database.db
 backend/database.db-shm
 backend/database.db-wal
+backend/nightcity.db
+backend/nightcity.db-shm
+backend/nightcity.db-wal
+
+# Production files
+.env.production
+ecosystem.config.js
+ssl/
+nginx.prod.conf
 
 # OS specific files
 .DS_Store
@@ -163,5 +173,3 @@ Thumbs.db
 *.swp
 *.swo
 *~
-*.md
-*.md
